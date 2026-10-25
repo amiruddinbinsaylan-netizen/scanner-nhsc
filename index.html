@@ -253,7 +253,7 @@
     $('pesanScan').textContent = 'Membuka kamera...';
     pembaca.start(
       { facingMode: hadap },
-      { fps: 10, qrbox: function (w, h) { return { width: Math.floor(Math.min(w * 0.92, 380)), height: Math.floor(Math.min(h * 0.55, 170)) }; } },
+      { fps: 10, qrbox: function (w, h) { return { width: Math.floor(Math.min(w * 0.92, 380)), height: Math.floor(Math.min(h * 0.85, 320)) }; } },
       function (teks) { proses(teks); },
       function () {}
     ).then(function () {
