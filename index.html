@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#0B2B26">
+<title>Pemindai Absensi NHSC</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { min-height: 100vh; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #fff; background: #0B2B26; }
+  [hidden] { display: none !important; }
+  .layar { max-width: 520px; margin: 0 auto; padding: 18px; }
+  h1 { margin-bottom: 4px; font-size: 20px; }
+  .sub { margin-bottom: 14px; font-size: 13px; opacity: .75; }
+  .kartu { margin-bottom: 14px; padding: 18px; border-radius: 20px; background: #163832; }
+  input { width: 100%; margin-bottom: 10px; padding: 14px; border: 0; border-radius: 14px; font-size: 16px; color: #051F20; background: #DAF1DE; }
+  button { width: 100%; padding: 14px; border: 0; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; color: #051F20; background: #8EB69B; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.hijau { color: #fff; background: #2E8B57; }
+  button.abu { color: #fff; background: #235347; }
+  .pesan { min-height: 20px; margin: 8px 0; font-size: 14px; color: #FFB4A8; }
+  #pembaca { width: 100%; min-height: 260px; overflow: hidden; border-radius: 16px; background: #000; }
+  .dua { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .atas { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .atas button { width: auto; padding: 8px 14px; font-size: 13px; }
+  .riwayat { list-style: none; font-size: 14px; }
+  .riwayat li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, .1); }
+  .t-ok { color: #7BE0A0; } .t-sudah { color: #FFD37A; } .t-gagal { color: #FF9C8F; }
+
+  /* POP-UP */
+  #popup { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px; animation: muncul .18s ease; }
+  #popup.ok { background: rgba(26, 135, 76, .97); }
+  #popup.sudah { background: rgba(205, 142, 18, .97); }
+  #popup.gagal { background: rgba(186, 53, 40, .97); }
+  .kotak { width: 100%; max-width: 380px; text-align: center; }
+  .ikon { display: grid; place-items: center; width: 120px; height: 120px; margin: 0 auto 18px; border-radius: 50%; font-size: 70px; font-weight: 800; background: #fff; animation: pop .4s cubic-bezier(.2, 1.4, .4, 1); }
+  #popup.ok .ikon { color: #1A874C; } #popup.sudah .ikon { color: #CD8E12; } #popup.gagal .ikon { color: #BA3528; }
+  .judul { font-size: 26px; font-weight: 800; letter-spacing: .5px; }
+  .nama { margin: 10px 0 4px; font-size: 30px; font-weight: 700; line-height: 1.2; }
+  .rinci { font-size: 17px; opacity: .95; margin-top: 4px; }
+  @keyframes muncul { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="layar" id="layarLogin">
+  <h1>Pemindai Absensi NHSC</h1>
+  <p class="sub">Masuk dengan akun aplikasi NHSC Anda.</p>
+  <div class="kartu">
+    <input id="user" placeholder="Username atau email" autocomplete="username" autocapitalize="none">
+    <input id="sandi" type="password" placeholder="Password" autocomplete="current-password">
+    <div class="pesan" id="pesanLogin"></div>
+    <button class="hijau" id="btnMasuk">Masuk</button>
+  </div>
+  <p class="sub" id="infoApi"></p>
+</div>
+
+<!-- PEMINDAI -->
+<div class="layar" id="layarScan" hidden>
+  <div class="atas">
+    <div><h1>Pemindai Absensi</h1><div class="sub" id="namaUser" style="margin:0"></div></div>
+    <button class="abu" id="btnKeluar">Keluar</button>
+  </div>
+  <div class="kartu">
+    <div id="pembaca"></div>
+    <div class="dua">
+      <button class="hijau" id="btnMulai">Mulai Pindai</button>
+      <button class="abu" id="btnBalik" disabled>Balik Kamera</button>
+    </div>
+    <div class="pesan" id="pesanScan"></div>
+  </div>
+  <div class="kartu">
+    <div class="sub">Barcode rusak? Ketik ID santri lalu catat hadir:</div>
+    <input id="manual" placeholder="Contoh: SNT-001" autocapitalize="characters" autocomplete="off">
+    <button id="btnManual">Catat Hadir</button>
+  </div>
+  <div class="kartu">
+    <div class="atas"><b>Riwayat sesi ini</b><span class="sub" id="hitung" style="margin:0">0 tercatat</span></div>
+    <ul class="riwayat" id="riwayat"></ul>
+  </div>
+</div>
+
+<!-- POP-UP -->
+<div id="popup" hidden>
+  <div class="kotak">
+    <div class="ikon" id="pIkon"></div>
+    <div class="judul" id="pJudul"></div>
+    <div class="nama" id="pNama"></div>
+    <div class="rinci" id="pRinci1"></div>
+    <div class="rinci" id="pRinci2"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  function $(id) { return document.getElementById(id); }
+  function ingat(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+  function taruh(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function lupa(k) { try { localStorage.removeItem(k); } catch (e) {} }
+
+  // Alamat aplikasi (Apps Script /exec): dari tautan ?api=..., atau dari ingatan browser
+  var params = new URLSearchParams(location.search);
+  var API = params.get('api') || ingat('nhsc_api');
+  if (params.get('api')) { taruh('nhsc_api', params.get('api')); history.replaceState(null, '', location.pathname); }
+
+  var token = ingat('nhsc_token');
+  var pembaca = null, aktif = false, sibuk = false, hadap = 'environment';
+  var terakhir = { kode: '', t: 0 }, jumlah = 0, riwayat = [], audio = null, timerPopup = null;
+
+  $('infoApi').textContent = API ? 'Terhubung ke aplikasi NHSC.' : 'Alamat aplikasi belum diatur. Buka halaman ini lewat tombol "Buka pemindai" di menu Barcode Santri.';
+
+  function api(data) {
+    if (!API) return Promise.reject(new Error('Alamat aplikasi belum diatur. Buka pemindai lewat tombol "Buka pemindai" di menu Barcode Santri.'));
+    return fetch(API, { method: 'POST', body: JSON.stringify(data) }).then(function (r) { return r.json(); });
+  }
+  function galat(e) {
+    var p = String(e && e.message ? e.message : e);
+    return /Failed to fetch|NetworkError|Load failed/i.test(p) ? 'Tidak bisa terhubung ke server. Periksa internet dan pastikan aplikasi sudah di-deploy dengan akses "Anyone".' : p;
+  }
+  function layar(nama) { $('layarLogin').hidden = nama !== 'login'; $('layarScan').hidden = nama !== 'scan'; }
+
+  // ----- Login -----
+  function masuk() {
+    var u = $('user').value.trim(), p = $('sandi').value;
+    if (!u || !p) { $('pesanLogin').textContent = 'Isi username dan password.'; return; }
+    $('pesanLogin').textContent = 'Memeriksa...';
+    $('btnMasuk').disabled = true;
+    api({ aksi: 'login', username: u, password: p }).then(function (res) {
+      $('btnMasuk').disabled = false;
+      if (!res.ok) { $('pesanLogin').textContent = res.pesan || 'Login gagal.'; return; }
+      token = res.token;
+      taruh('nhsc_token', token);
+      taruh('nhsc_nama', res.user.nama);
+      $('sandi').value = '';
+      $('pesanLogin').textContent = '';
+      bukaScan();
+    }).catch(function (e) { $('btnMasuk').disabled = false; $('pesanLogin').textContent = galat(e); });
+  }
+  $('btnMasuk').onclick = masuk;
+  $('sandi').onkeydown = function (e) { if (e.key === 'Enter') masuk(); };
+
+  function bukaScan() {
+    layar('scan');
+    $('namaUser').textContent = 'Masuk sebagai ' + (ingat('nhsc_nama') || 'petugas');
+  }
+  function keluar(pesan) {
+    berhenti().then(function () {
+      token = '';
+      lupa('nhsc_token');
+      layar('login');
+      $('pesanLogin').textContent = pesan || '';
+    });
+  }
+  $('btnKeluar').onclick = function () { keluar(''); };
+
+  // ----- Pop-up besar, bunyi, getar -----
+  function bunyi(jenis) {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      var o = audio.createOscillator(), g = audio.createGain();
+      o.connect(g); g.connect(audio.destination);
+      o.frequency.value = jenis === 'ok' ? 880 : (jenis === 'sudah' ? 600 : 220);
+      g.gain.value = 0.15;
+      o.start();
+      setTimeout(function () { o.stop(); }, jenis === 'gagal' ? 420 : 170);
+    } catch (e) {}
+    if (navigator.vibrate) navigator.vibrate(jenis === 'ok' ? 120 : [80, 60, 80]);
+  }
+  function tutupPopup() {
+    clearTimeout(timerPopup);
+    $('popup').hidden = true;
+    sibuk = false;
+  }
+  function popup(jenis, judul, nama, r1, r2) {
+    $('popup').className = jenis;
+    $('pIkon').textContent = jenis === 'ok' ? '✔' : (jenis === 'sudah' ? '!' : '✖');
+    $('pJudul').textContent = judul;
+    $('pNama').textContent = nama || '';
+    $('pRinci1').textContent = r1 || '';
+    $('pRinci2').textContent = r2 || '';
+    $('popup').hidden = false;
+    bunyi(jenis);
+    clearTimeout(timerPopup);
+    timerPopup = setTimeout(tutupPopup, jenis === 'gagal' ? 3200 : (jenis === 'sudah' ? 2600 : 2200));
+  }
+  $('popup').onclick = tutupPopup;
+
+  function catat(jenis, nama, ket) {
+    var n = new Date();
+    riwayat.unshift({ jam: ('0' + n.getHours()).slice(-2) + ':' + ('0' + n.getMinutes()).slice(-2), jenis: jenis, nama: nama, ket: ket });
+    riwayat = riwayat.slice(0, 8);
+    $('riwayat').innerHTML = riwayat.map(function (r) {
+      var li = document.createElement('li');
+      return '<li><span>' + r.jam + ' &nbsp;' + esc(r.nama) + '</span><span class="t-' + r.jenis + '">' + esc(r.ket) + '</span></li>';
+    }).join('');
+    $('hitung').textContent = jumlah + ' tercatat';
+  }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  // ----- Memproses hasil pindai -----
+  function proses(kode) {
+    kode = String(kode || '').trim();
+    if (!kode || sibuk) return;
+    var sekarang = Date.now();
+    if (kode === terakhir.kode && sekarang - terakhir.t < 4000) return;
+    terakhir = { kode: kode, t: sekarang };
+    sibuk = true;
+    $('pesanScan').textContent = 'Memproses ' + kode + '...';
+    api({ aksi: 'scan', token: token, kode: kode }).then(function (res) {
+      $('pesanScan').textContent = '';
+      if (res.sesiBerakhir) { sibuk = false; keluar('Sesi berakhir. Silakan masuk lagi.'); return; }
+      if (!res.ok) { popup('gagal', 'GAGAL', kode, res.pesan || 'Tidak dikenal', ''); catat('gagal', kode, 'Gagal'); return; }
+      var kelas = res.kelas ? '  •  Kelas ' + res.kelas : '';
+      var piket = res.tempat ? 'Piket: ' + res.tempat + ' (' + (res.kloter === 'Minggu' ? 'Minggu' : 'Kloter ' + res.kloter) + ')' : 'Tidak dijadwalkan piket hari ini';
+      if (res.status === 'sudah') {
+        popup('sudah', 'SUDAH TERCATAT', res.nama, res.asrama + kelas, 'Sudah Hadir hari ini');
+        catat('sudah', res.nama, 'Sudah');
+      } else if (res.status === 'diubah') {
+        jumlah++;
+        popup('ok', 'HADIR DIPERBARUI', res.nama, res.asrama + kelas, 'Sebelumnya ' + res.sebelumnya + ' → Hadir  •  ' + res.jam);
+        catat('ok', res.nama, 'Hadir*');
+      } else {
+        jumlah++;
+        popup('ok', 'HADIR TERCATAT', res.nama, res.asrama + kelas, 'Pukul ' + res.jam + '  •  ' + piket);
+        catat('ok', res.nama, 'Hadir');
+      }
+    }).catch(function (e) {
+      $('pesanScan').textContent = '';
+      popup('gagal', 'GAGAL TERHUBUNG', '', galat(e), '');
+      catat('gagal', kode, 'Gagal');
+    });
+  }
+
+  // ----- Kamera -----
+  function setTombol() {
+    $('btnMulai').textContent = aktif ? 'Hentikan' : 'Mulai Pindai';
+    $('btnMulai').className = aktif ? 'abu' : 'hijau';
+    $('btnBalik').disabled = !aktif;
+  }
+  function mulai() {
+    if (!window.Html5Qrcode) { $('pesanScan').textContent = 'Pustaka pemindai belum termuat. Periksa internet lalu muat ulang halaman.'; return; }
+    if (!pembaca) {
+      pembaca = new Html5Qrcode('pembaca', {
+        formatsToSupport: [Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.QR_CODE],
+        useBarCodeDetectorIfSupported: true, verbose: false
+      });
+    }
+    try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+    $('pesanScan').textContent = 'Membuka kamera...';
+    pembaca.start(
+      { facingMode: hadap },
+      { fps: 10, qrbox: function (w, h) { return { width: Math.floor(Math.min(w * 0.92, 380)), height: Math.floor(Math.min(h * 0.55, 170)) }; } },
+      function (teks) { proses(teks); },
+      function () {}
+    ).then(function () {
+      aktif = true;
+      $('pesanScan').textContent = '';
+      setTombol();
+      if (navigator.wakeLock) navigator.wakeLock.request('screen').catch(function () {});
+    }).catch(function (err) {
+      aktif = false;
+      setTombol();
+      var p = String(err && err.message ? err.message : err);
+      $('pesanScan').textContent = /Permission|NotAllowed|denied/i.test(p)
+        ? 'Izin kamera ditolak. Izinkan kamera untuk situs ini di pengaturan browser, lalu coba lagi.'
+        : 'Kamera tidak bisa dibuka: ' + p;
+    });
+  }
+  function berhenti() {
+    if (!pembaca || !aktif) { aktif = false; setTombol(); return Promise.resolve(); }
+    return pembaca.stop().catch(function () {}).then(function () { aktif = false; setTombol(); });
+  }
+  $('btnMulai').onclick = function () { if (aktif) berhenti(); else mulai(); };
+  $('btnBalik').onclick = function () {
+    hadap = hadap === 'environment' ? 'user' : 'environment';
+    berhenti().then(mulai);
+  };
+
+  // ----- Ketik manual -----
+  function manual() {
+    var k = $('manual').value.trim();
+    if (!k) return;
+    $('manual').value = '';
+    terakhir = { kode: '', t: 0 };
+    proses(k);
+  }
+  $('btnManual').onclick = manual;
+  $('manual').onkeydown = function (e) { if (e.key === 'Enter') manual(); };
+
+  // ----- Saat halaman dibuka: cek apakah masih masuk -----
+  if (token && API) {
+    api({ aksi: 'sesi', token: token }).then(function (res) {
+      if (res.ok) bukaScan(); else { lupa('nhsc_token'); layar('login'); }
+    }).catch(function () { layar('login'); });
+  } else {
+    layar('login');
+  }
+})();
+</script>
+</body>
+</html>
